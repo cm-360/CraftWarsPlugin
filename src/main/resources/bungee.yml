@@ -1,0 +1,6 @@
+name: "CraftWarsPlugin"
+main: "com.github.cm360.cwplugin.CraftWarsPlugin"
+version: "1.0.0"
+author: "cm360"
+api-version: 1.16
+softdepend: [LuckPerms, PlaceholderAPI]
