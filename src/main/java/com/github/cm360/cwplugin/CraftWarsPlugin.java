@@ -1,15 +1,16 @@
 package com.github.cm360.cwplugin;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.InetAddress;
+import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.URL;
 
 import com.github.cm360.cwplugin.commands.DiscordCommand;
 import com.github.cm360.cwplugin.commands.RulesCommand;
 import com.github.cm360.cwplugin.integrations.IntegrationsListener;
-import com.github.cm360.cwplugin.network.DatagramEndpoint;
+import com.sun.net.httpserver.HttpServer;
 
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
@@ -19,37 +20,53 @@ import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.plugin.Plugin;
 import net.md_5.bungee.api.plugin.PluginManager;
+import net.md_5.bungee.config.Configuration;
+import net.md_5.bungee.config.ConfigurationProvider;
+import net.md_5.bungee.config.YamlConfiguration;
 
 public class CraftWarsPlugin extends Plugin {
-
-	private DatagramEndpoint endpoint;
+	
+	private Configuration config;
+	private URL discordWebhookUrl;
+	private String apiEndpointUrl;
+	private String skinIconsUrl;
+	
+	private HttpServer apiServer;
 	private IntegrationsListener integrations;
+	
 	private LuckPerms luckPerms;
 	
 	@Override
 	public void onEnable() {
 		try {
+			getOrMakeConfig();
+			
 			PluginManager pluginManager = getProxy().getPluginManager();
-			// Obtain LuckPerms API object if loaded
 			if (pluginManager.getPlugin("LuckPerms") != null)
 				luckPerms = LuckPermsProvider.get();
-			// PlaceholderAPI
-			if (getProxy().getPluginManager().getPlugin("PlaceholderAPI") != null) {
+			if (pluginManager.getPlugin("PlaceholderAPI") != null) {
 				// Do nothing for now :D
 			}
-			// Create UDP endpoint
-			InetAddress localhost = InetAddress.getLoopbackAddress();
-			int bindPort = 9899; // 98 and 99 are the ASCII character codes for B and C (for BungeeCord!)
-			int sendPort = 9989;
-			long guildId = readGuildId();
-			endpoint = new DatagramEndpoint(this, localhost, bindPort, localhost, sendPort, guildId);
-			getLogger().info(String.format("UDP socket successfully bound to %s:%d, sending packets to %s:%d", localhost, bindPort, localhost, sendPort));
+			
+			// Create HTTP server
+			String bindAddress = config.getString("http_server.bind_address");
+			int bindPort = config.getInt("http_server.bind_port");
+			apiServer = HttpServer.create(new InetSocketAddress(bindAddress, bindPort), 0);
+			
 			// Register Bungeecord API event listeners
-			integrations = new IntegrationsListener(this, endpoint, luckPerms);
-			getProxy().getPluginManager().registerListener(this, integrations);
+			discordWebhookUrl = new URL(config.getString("urls.discord_webhook"));
+			apiEndpointUrl = config.getString("urls.api_endpoint");
+			skinIconsUrl = config.getString("urls.skin_icons");
+			integrations = new IntegrationsListener(this);
+			pluginManager.registerListener(this, integrations);
+			
 			// Register commands
-			getProxy().getPluginManager().registerCommand(this, new DiscordCommand(this));
-			getProxy().getPluginManager().registerCommand(this, new RulesCommand(this));
+			pluginManager.registerCommand(this, new DiscordCommand(this));
+			pluginManager.registerCommand(this, new RulesCommand(this));
+			
+			// Start HTTP server
+			apiServer.start();
+			getLogger().info(String.format("HTTP server successfully started on %s:%d", bindAddress, bindPort));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -58,7 +75,20 @@ public class CraftWarsPlugin extends Plugin {
 	@Override
 	public void onDisable() {
 		integrations.close();
-		endpoint.close();
+	}
+	
+	public void getOrMakeConfig() throws IOException {
+		if (!getDataFolder().exists()) {
+			getDataFolder().mkdir();
+		}
+		File configFile = new File(getDataFolder(), "config.yml");
+		if (!configFile.exists()) {
+			// Copy default config
+			FileOutputStream outputStream = new FileOutputStream(configFile);
+			InputStream in = getResourceAsStream("config.yml");
+			in.transferTo(outputStream);
+		}
+		config = ConfigurationProvider.getProvider(YamlConfiguration.class).load(configFile);
 	}
 	
 	public static BaseComponent[] getMessagePrefix() {
@@ -77,12 +107,24 @@ public class CraftWarsPlugin extends Plugin {
 				.create();
 	}
 	
-	private long readGuildId() throws IOException {
-		File guildIdFile = new File(getDataFolder(), "guild_id.txt");
-		BufferedReader br = new BufferedReader(new FileReader(guildIdFile));
-		long guildId = Long.parseLong(br.readLine());
-		br.close();
-		return guildId;
+	public HttpServer getLocalApiServer() {
+		return apiServer;
+	}
+	
+	public LuckPerms getLuckPermsInstance() {
+		return luckPerms;
+	}
+	
+	public URL getDiscordWebhookUrl() {
+		return discordWebhookUrl;
+	}
+	
+	public String getRemoteApiEndpointUrl() {
+		return apiEndpointUrl;
+	}
+	
+	public String getSkinIconsUrl() {
+		return skinIconsUrl;
 	}
 
 }

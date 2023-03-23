@@ -2,6 +2,7 @@ package com.github.cm360.cwplugin.integrations.playtime;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -12,11 +13,14 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import com.github.cm360.cwplugin.CraftWarsPlugin;
 import com.github.cm360.cwplugin.commands.PlayTimeCommand;
 import com.github.cm360.cwplugin.integrations.playtime.awards.CommandsAward;
 import com.github.cm360.cwplugin.integrations.playtime.awards.PermissionGroupAward;
 import com.github.cm360.cwplugin.integrations.playtime.awards.PlayTimeAward;
-import com.github.cm360.cwplugin.network.DatagramEndpoint;
+import com.github.cm360.cwplugin.network.HttpPostClient;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 
 import net.luckperms.api.LuckPerms;
 import net.md_5.bungee.api.ProxyServer;
@@ -34,7 +38,7 @@ public class PlayTimeIntegration {
 	private LuckPerms luckPerms;
 	private ScheduledTask checkTask;
 	private ScheduledTask saveTask;
-	private DatagramEndpoint endpoint;
+	private String apiUrlTemplate;
 	private Map<UUID, Long> playTimes;
 	private Map<UUID, Long> startTimes;
 	private Map<UUID, String> usernameCache;
@@ -42,10 +46,10 @@ public class PlayTimeIntegration {
 	private Map<String, PlayTimeAward> configuredAwards;
 	
 	
-	public PlayTimeIntegration(Plugin plugin, DatagramEndpoint endpoint, LuckPerms luckPerms) {
+	public PlayTimeIntegration(CraftWarsPlugin plugin) {
 		this.plugin = plugin;
-		this.luckPerms = luckPerms;
-		this.endpoint = endpoint;
+		this.luckPerms = plugin.getLuckPermsInstance();
+		this.apiUrlTemplate = plugin.getRemoteApiEndpointUrl();
 		this.playTimes = new HashMap<UUID, Long>();
 		this.startTimes = new HashMap<UUID, Long>();
 		this.usernameCache = new HashMap<UUID, String>();
@@ -201,11 +205,22 @@ public class PlayTimeIntegration {
 		// Send data over UDP
 		SortedMap<UUID, Long> playerTimesSorted = getSortedPlayTimes();
 		plugin.getProxy().getScheduler().runAsync(plugin, () -> {
-			endpoint.send("playtimes", String.join(",", playerTimesSorted.keySet().stream()
-					.map(uuid -> {
+			JsonObject postData = new JsonObject();
+			JsonArray allPlayerStats = new JsonArray();
+			playerTimesSorted.keySet().stream()
+					.forEach(uuid -> {
+						JsonObject thisPlayerStats = new JsonObject();
 						ProxiedPlayer player = plugin.getProxy().getPlayer(uuid);
-						return String.format("%s %d", player == null ? usernameCache.get(uuid) : player.getName(), playerTimesSorted.get(uuid));
-					}).collect(Collectors.toList())));
+						thisPlayerStats.addProperty("name", player == null ? usernameCache.get(uuid) : player.getName());
+						thisPlayerStats.addProperty("time", playerTimesSorted.get(uuid));
+						allPlayerStats.add(thisPlayerStats);
+					});
+			postData.add("players", allPlayerStats);
+			try {
+				HttpPostClient.doJsonPost(new URL(apiUrlTemplate + "update_player_stats"), postData);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		});
 	}
 	

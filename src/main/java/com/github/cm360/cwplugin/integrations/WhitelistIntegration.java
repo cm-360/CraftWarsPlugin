@@ -2,20 +2,17 @@ package com.github.cm360.cwplugin.integrations;
 
 import java.util.logging.Level;
 
-import com.github.cm360.cwplugin.network.DatagramEndpoint;
-
 import net.md_5.bungee.api.plugin.Plugin;
 
 public class WhitelistIntegration {
 
 	private final Plugin plugin;
-	private DatagramEndpoint endpoint;
 
-	public WhitelistIntegration(Plugin plugin, DatagramEndpoint endpoint) {
+	public WhitelistIntegration(Plugin plugin) {
 		this.plugin = plugin;
-		this.endpoint = endpoint;
-		endpoint.registerListener("register", data -> dispatchWhitelistCommand("add", data));
-		endpoint.registerListener("unregister", data -> dispatchWhitelistCommand("remove", data));
+//		this.endpoint = endpoint;
+//		endpoint.registerListener("register", data -> dispatchWhitelistCommand("add", data));
+//		endpoint.registerListener("unregister", data -> dispatchWhitelistCommand("remove", data));
 	}
 	
 	private void dispatchWhitelistCommand(String command, String data) {

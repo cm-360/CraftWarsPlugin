@@ -4,9 +4,7 @@ import java.util.stream.Collectors;
 
 import com.github.cm360.cwplugin.CraftWarsPlugin;
 import com.github.cm360.cwplugin.integrations.playtime.PlayTimeIntegration;
-import com.github.cm360.cwplugin.network.DatagramEndpoint;
 
-import net.luckperms.api.LuckPerms;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.connection.Connection;
@@ -16,25 +14,23 @@ import net.md_5.bungee.api.event.PlayerDisconnectEvent;
 import net.md_5.bungee.api.event.PostLoginEvent;
 import net.md_5.bungee.api.event.ServerSwitchEvent;
 import net.md_5.bungee.api.plugin.Listener;
-import net.md_5.bungee.api.plugin.Plugin;
 import net.md_5.bungee.event.EventHandler;
 
 public class IntegrationsListener implements Listener {
 
-	private final Plugin plugin;
-	private LuckPerms luckPerms;
+	private final CraftWarsPlugin plugin;
+	
 	private ChatIntegration chatIntegration;
 	private PlayerListIntegration playerListIntegration;
 	private PlayTimeIntegration playTimeIntegration;
 	private WhitelistIntegration whitelistIntegration;
 	
-	public IntegrationsListener(CraftWarsPlugin plugin, DatagramEndpoint endpoint, LuckPerms luckPerms) {
+	public IntegrationsListener(CraftWarsPlugin plugin) {
 		this.plugin = plugin;
-		this.luckPerms = luckPerms;
-		this.chatIntegration = new ChatIntegration(plugin, endpoint);
-		this.playerListIntegration = new PlayerListIntegration(plugin, endpoint);
-		this.playTimeIntegration = new PlayTimeIntegration(plugin, endpoint, luckPerms);
-		this.whitelistIntegration = new WhitelistIntegration(plugin, endpoint);
+		this.chatIntegration = new ChatIntegration(plugin);
+		this.playerListIntegration = new PlayerListIntegration(plugin);
+		this.playTimeIntegration = new PlayTimeIntegration(plugin);
+//		this.whitelistIntegration = new WhitelistIntegration(plugin, apiUrlTemplate);
 	}
 	
 	@EventHandler
